@@ -153,3 +153,95 @@ the PR template. No application code, no stack decisions.
 **Next:** Independent ChatGPT review of the PR diff; then Stage 1 items in
 [ROADMAP.md](ROADMAP.md) — the highest-value one is exercising the protocol on
 a real issue and recording the friction here.
+
+---
+
+## 2026-09-06 — Sync Ditto with App-Factory foundation v0.1.0
+
+**Done:** Ported the reviewed reusable foundation from
+`anthracite-labs/App-Factory@ffe4382677c5237d2c86066c96742cf96a5f10fe` into
+Ditto's existing engineering system. This is an **App-Factory foundation sync,
+not an ECC upgrade**. The root `FOUNDATION_VERSION` is `0.1.0`; the ECC pin is
+still `2.2.0` / `v2.2.0` /
+`5eddf1a3ffd311423be2d4ba7d26f7209c91b033`, with AgentShield still `1.4.0`.
+The written migration plan was committed before implementation; see
+[the plan](plans/2026-09-06-foundation-v0.1.0-sync.md).
+
+- Added committed lifecycle state: Ditto / ditto / **discovery** /
+  `ALLOW_APP_STACK=0` / empty `STACK_DECISION_ADR`. The product is still
+  undefined, so architecture would have been an invented advancement.
+- Ported foundation/version checks, shared accepted-stack validation,
+  lifecycle-aware bootstrap, safe identity-only initialization, structural
+  ruleset validation, stronger CI contracts and all applicable source tests.
+- Extended the source hardening where needed: every lifecycle key is validated
+  in standalone mode; ADR metadata is exact and unambiguous, including matching
+  fence delimiters/lengths and comment handling; ADR/config paths cannot use
+  traversal or symlinks. Init refuses malformed state and newline arguments,
+  writes atomically and preserves phase, allow flag and ADR under `--force`.
+- Kept the secrets scanner exemption-free and fixed filename-based disclosure:
+  matched text is removed before capture, and the gate banner never echoes
+  unvalidated foundation/lifecycle values. `.env*` detection has no depth limit;
+  only regular `.env.example` templates are allowed and still secret-scanned.
+- CI checks actual commands, required jobs, event coverage, pinned actions,
+  read-only permissions and checkout/environment settings. Both jobs validate
+  the actual contracts; a bare allow flag no longer stands down the independent
+  check. The portable JSON rejects duplicate/decoy fields, extra or duplicate
+  contexts and nested instance IDs.
+- AgentShield still reports zero-file scans as **SKIP/advisory**. Malformed
+  summaries are rejected rather than interpreted as zeroes, and the package pin
+  is rechecked before any standalone invocation. Test reports never leak values.
+
+**Preserved:** Every prior entry above is byte-for-byte intact. Existing
+product/domain/architecture/roadmap documents, `ARENA_CAPABILITIES.md`, the ADR
+template and ADRs 0001–0003 are unchanged. Existing `.ecc/VERSION` and
+`.ecc/UPSTREAM.md` remain exact prefixes with a separately appended foundation
+sync record; `.ecc/LICENSE-ECC` remains unchanged. No product, framework,
+database, auth, hosting or UI was chosen. No App-Factory generic project history
+or reset documents were imported.
+
+**Verified in this session:**
+
+- Downloaded the pinned App-Factory archive outside Ditto and verified all 50
+  files against the pinned Git tree's blob hashes; GitHub `main` matched the pin.
+- Before changes: `bash scripts/verify.sh` → **14 passed, 0 failed, 1 skipped**;
+  `bash scripts/selftest.sh` → **28/28**.
+- New regression cases were run RED against the old/initially ported gate, then
+  GREEN after the fixes; negative assertions require the intended named failure
+  and exit 1, not an arbitrary runner error.
+- With **both ShellCheck 0.9.0 and 0.11.0**, `bash scripts/verify.sh` →
+  **17 passed, 0 failed, 1 skipped** (only AgentShield, which ran but scanned
+  zero files); `bash scripts/selftest.sh` → **257/257 cases**. Style-level
+  ShellCheck also ran directly against all five shell scripts under both versions.
+- Fetched ECC's upstream licence at the unchanged commit and compared bytes:
+  sha256 `326146379f01bb137c0a5d3c54770c1aa31076705c8b88a7f6b26a460f6221b2`.
+  Peeled the annotated `v2.2.0` tag to confirm the exact ECC commit. Also checked
+  both Actions pins against their recorded release tags.
+- Read the live main ruleset and effective branch rules. **Main is protected**,
+  with PRs, review-thread resolution, strict checks and creation/deletion/
+  force-push protections. Required job names are exactly **Foundation gate**
+  and **Independent checks**. No live administrative settings were changed.
+
+**Learned / corrections to older observations:**
+
+- Earlier entries correctly recorded main protection as pending *then*. It is
+  active now. Preserve those observations rather than rewriting project history.
+- The live solo-owner ruleset requires zero human approvals and the connection
+  reports bypass capability. That is not platform enforcement of independent
+  ChatGPT review or no self-merge. Those remain explicit operational rules;
+  administrators should audit bypass and approval policy separately.
+- A portable request body must not be a raw GitHub export. Ditto retains its
+  creation and unattributed-change protections; App-Factory's stale-review
+  dismissal is proposed in the payload but not silently applied to live settings.
+- Line-oriented matching is unsafe at several boundaries: filename delimiters
+  can disclose secrets, multiline init arguments can inject assignments, and
+  arbitrary fence toggling can turn examples into approval metadata.
+- Python/PyYAML are now required for structural CI validation. Install tooling in
+  an isolated directory outside the repo; no application dependency manifest
+  was introduced to run engineering tests.
+
+**Next:** Leave the migration PR open for independent ChatGPT review of the real
+diff; never self-merge or push to main. Check the PR's actual GitHub CI results,
+not just this local record. [ADR-0004](decisions/0004-foundation-lifecycle-sync.md)
+remains proposed until review is accepted. See [FOUNDATION.md](FOUNDATION.md) for
+the explicit source differences, lifecycle contract and human-only admin audit.
+Product definition remains the product owner's next decision, not an agent's.

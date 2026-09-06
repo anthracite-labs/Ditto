@@ -2,8 +2,9 @@
 # Ditto session bootstrap briefing.
 #
 # Prints everything a fresh Arena session (or a human) needs to start working:
-# provenance, the always-read set, the workflow index, and the verification
-# command. Read-only: this script never modifies the repository.
+# foundation version, project lifecycle state, provenance, the always-read set,
+# the workflow index, and the verification command. Read-only: this script
+# never modifies the repository.
 #
 # Usage:
 #   scripts/bootstrap.sh              print the briefing
@@ -22,9 +23,9 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --issue) shift; ISSUE="${1:-}" ;;
     --issue=*) ISSUE="${1#--issue=}" ;;
-    --quiet|-q) QUIET=0; QUIET=1 ;;
+    --quiet|-q) QUIET=1 ;;
     -h|--help)
-      sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+      sed -n '2,13p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *)
@@ -39,10 +40,45 @@ version_value() {
   sed -n "s/^${1}=//p" .ecc/VERSION 2>/dev/null | head -n 1
 }
 
+config_value() {
+  sed -n "s/^[[:space:]]*${1}[[:space:]]*=[[:space:]]*//p" config/project.env 2>/dev/null |
+    head -n 1 | sed 's/[[:space:]]*$//'
+}
+
 h1() { [ "$QUIET" -eq 1 ] || printf '\n== %s\n' "$*"; }
 line() { printf '%s\n' "$*"; }
 
-h1 "Ditto — ECC-on-Arena adapter"
+project_name="$(config_value PROJECT_NAME)"
+phase="$(config_value PROJECT_PHASE)"
+
+# Refuse to brief an agent from ambiguous or hostile lifecycle state.
+if ! bash scripts/verify.sh --only=lifecycle --quiet >/dev/null 2>&1; then
+  printf 'bootstrap.sh: invalid lifecycle state; run bash scripts/verify.sh --only=lifecycle\n' >&2
+  exit 1
+fi
+
+h1 "Ditto project"
+line "name:       ${project_name:-<not set — run scripts/init-project.sh>}"
+line "phase:      ${phase:-unknown}"
+line "app stack:  allowed=$(config_value ALLOW_APP_STACK) adr=$(config_value STACK_DECISION_ADR)"
+line "foundation: App-Factory v$(head -n 1 FOUNDATION_VERSION 2>/dev/null || echo unknown)"
+
+case "$phase" in
+  discovery)
+    line "note:       no product definition yet. Do not invent one; see docs/PRODUCT.md."
+    ;;
+  architecture)
+    line "note:       product defined, stack being decided. Record it as an ADR."
+    ;;
+  implementation)
+    line "note:       stack recorded in $(config_value STACK_DECISION_ADR)."
+    ;;
+  *)
+    line "note:       PROJECT_PHASE is unrecognised; check config/project.env."
+    ;;
+esac
+
+h1 "ECC-on-Arena adapter"
 line "adapter:  $(version_value ADAPTER_NAME) v$(version_value ADAPTER_VERSION)"
 line "upstream: ECC $(version_value UPSTREAM_VERSION) ($(version_value UPSTREAM_TAG), $(version_value UPSTREAM_COMMIT))"
 line "licence:  $(version_value UPSTREAM_LICENSE) — adapted, attributed per file"
@@ -53,6 +89,7 @@ line ".ecc/BOOTSTRAP.md          session protocol — read this first"
 line ".ecc/rules/engineering.md  standing engineering rules"
 line ".ecc/skills/INDEX.md       workflow router — pick 1-2 workflows"
 line "docs/MEMORY.md             what previous sessions learned (append to it)"
+line "config/project.env         the project's actual lifecycle state"
 line "ARENA_CAPABILITIES.md      only if the task touches tooling, network, or CI"
 
 h1 "Load on demand (never all at once)"
@@ -78,7 +115,8 @@ for role in .ecc/roles/*.md; do
 done
 
 h1 "Verify before claiming done"
-line "bash scripts/verify.sh"
+line "bash scripts/verify.sh     authoritative gate"
+line "bash scripts/selftest.sh   negative tests — the gate must reject faults"
 
 h1 "State"
 line "branch:   $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo unknown)"

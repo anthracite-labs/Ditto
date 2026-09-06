@@ -3,6 +3,11 @@
 # GitHub runs the same committed gate (scripts/verify.sh) that the agent runs
 # locally, so quality never depends on an agent's self-report. See
 # docs/decisions/0002-verification-gate.md.
+#
+# The two job names below are load-bearing: they are the required status
+# contexts in config/main-ruleset.json. Renaming a job would leave the default
+# branch waiting for a context no longer produced. The ci_wiring check fails if
+# the workflow and ruleset disagree, or required execution is made optional.
 name: verify
 
 on:
@@ -22,9 +27,12 @@ jobs:
   gate:
     name: Foundation gate
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
         uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
@@ -57,9 +65,12 @@ jobs:
   independent-checks:
     name: Independent checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Ensure shellcheck is present
         run: |
@@ -80,7 +91,8 @@ jobs:
         run: |
           set -euo pipefail
           fail=0
-          for f in scripts/verify.sh scripts/bootstrap.sh scripts/sync-ecc.sh; do
+          for f in scripts/verify.sh scripts/selftest.sh scripts/bootstrap.sh \
+                   scripts/init-project.sh scripts/sync-ecc.sh; do
             mode="$(git ls-files -s -- "$f" | awk '{print $1}')"
             if [ "$mode" != "100755" ]; then
               printf 'not executable in index (mode %s): %s\n' "${mode:-missing}" "$f"
@@ -96,29 +108,41 @@ jobs:
           grep -qi 'not native ECC' AGENTS.md .ecc/BOOTSTRAP.md README.md
           grep -q 'ADAPTER_NATIVE_ECC_RUNTIME=false' .ecc/VERSION
 
-      - name: Confirm no application stack was introduced
-        run: |
-          set -euo pipefail
-          forbidden=(package.json requirements.txt pyproject.toml Dockerfile tsconfig.json)
-          fail=0
-          for f in "${forbidden[@]}"; do
-            if [ -e "$f" ]; then
-              printf 'application-stack artifact present: %s\n' "$f"
-              fail=1
-            fi
-          done
-          for d in src app lib client server; do
-            if [ -d "$d" ]; then
-              printf 'application directory present: %s/\n' "$d"
-              fail=1
-            fi
-          done
-          exit "$fail"
+      - name: Make PyYAML available for structural CI checks
+        run: python3 -c 'import yaml' 2>/dev/null || pip install --quiet 'pyyaml==6.0.3'
 
-      - name: Report adapter surface
+      - name: Independently validate foundation, lifecycle, provenance and governance
+        # Run the actual standalone contracts. Never trust a bare allow flag,
+        # a policy string in the wrong JSON location, or another job having run.
+        run: bash scripts/verify.sh --only=foundation_version --only=provenance --only=lifecycle --only=no_app_stack --only=ruleset --only=ci_wiring
+
+      - name: Confirm the lifecycle guard is config-driven, not hard-coded
         run: |
           set -euo pipefail
-          printf 'rules:  %s\n' "$(git ls-files -- '.ecc/rules/*.md' | wc -l)"
-          printf 'skills: %s\n' "$(git ls-files -- '.ecc/skills/*.md' | wc -l)"
-          printf 'roles:  %s\n' "$(git ls-files -- '.ecc/roles/*.md' | wc -l)"
-          printf 'adrs:   %s\n' "$(git ls-files -- 'docs/decisions/*.md' | wc -l)"
+          # The allow flag must live in committed config, not as a constant in
+          # the gate. A bare assignment in verify.sh would be a regression.
+          if grep -qE '^[[:space:]]*ALLOW_APP_STACK=' scripts/verify.sh; then
+            printf 'ALLOW_APP_STACK is hard-coded in scripts/verify.sh\n'
+            exit 1
+          fi
+          grep -qE '^ALLOW_APP_STACK=[01]$' config/project.env
+          grep -qE '^PROJECT_PHASE=(discovery|architecture|implementation)$' config/project.env
+
+      - name: Confirm no script performs GitHub administration
+        run: |
+          set -euo pipefail
+          if grep -nE 'gh api .*--method (POST|PUT|PATCH|DELETE)|gh repo edit|git push|curl[^|]*\| *(ba)?sh' scripts/*.sh; then
+            printf 'a script performs repository administration or remote execution\n'
+            exit 1
+          fi
+          printf 'no admin API calls, pushes, or curl-pipe-shell in scripts/\n'
+
+      - name: Report foundation surface
+        run: |
+          set -euo pipefail
+          printf 'foundation: %s\n' "$(head -n 1 FOUNDATION_VERSION)"
+          printf 'phase:      %s\n' "$(sed -n 's/^PROJECT_PHASE=//p' config/project.env | head -n 1)"
+          printf 'rules:      %s\n' "$(git ls-files -- '.ecc/rules/*.md' | wc -l)"
+          printf 'skills:     %s\n' "$(git ls-files -- '.ecc/skills/*.md' | wc -l)"
+          printf 'roles:      %s\n' "$(git ls-files -- '.ecc/roles/*.md' | wc -l)"
+          printf 'adrs:       %s\n' "$(git ls-files -- 'docs/decisions/*.md' | wc -l)"

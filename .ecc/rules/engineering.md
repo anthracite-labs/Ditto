@@ -61,6 +61,17 @@ Applies as soon as application code exists; harmless before that.
 - If the smallest correct change is larger than the issue implies, stop and
   say so rather than quietly expanding scope.
 
+## Lifecycle and foundation state
+
+- Read `config/project.env`; it is data, never shell to source. Ditto currently
+  remains in discovery with the no-stack guard up.
+- Change lifecycle state only in an explicit, reviewed config/ADR transition.
+  An environment override, example marker or gate edit is not an authorization.
+- Keep foundation, ECC and scanner provenance distinct; a foundation sync is
+  not an ECC upgrade. Preserve Ditto's own history and product decisions.
+- `docs/FOUNDATION.md` describes the accepted-stack metadata and human-only
+  governance boundary. Do not infer applied GitHub settings from a JSON file.
+
 ## Arena-specific rules
 
 Derived from `ARENA_CAPABILITIES.md` (verified 2026-09-06):

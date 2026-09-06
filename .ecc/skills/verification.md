@@ -27,26 +27,30 @@ bash scripts/verify.sh --skip-agentshield      # offline / no registry access
 VERIFY_AGENTSHIELD=require bash scripts/verify.sh   # fail if scanner cannot run
 ```
 
-Exit code 0 means every executed check passed. Non-zero means the change is not
-ready — read the failures, fix them, re-run.
+Exit code 0 means no selected check failed; a SKIP is still a SKIP, not proof of
+coverage. Non-zero means the change is not ready — read the failures, fix them,
+re-run.
 
 ## What the gate covers
 
 | Check | Asserts |
 | :-- | :-- |
-| `foundation` | required adapter, docs, CI, and script files exist |
+| `foundation` | required adapter, docs, config, CI, and script files exist |
+| `foundation_version` | one valid foundation SemVer, separate from the ECC record |
 | `links` | every relative Markdown link in repository `.md` files resolves |
 | `shell_syntax` | every `*.sh` passes `bash -n` |
 | `shell_lint` | shell scripts pass shellcheck at style severity (skipped if absent) |
 | `executable` | required scripts are executable on disk, and mode 100755 once tracked |
-| `provenance` | `.ecc/VERSION` records upstream version, tag, 40-char commit, licence |
+| `provenance` | exact reviewed ECC/scanner pins, full MIT notice, Ditto identity and App-Factory source record; no missing/duplicate required keys |
 | `attribution` | adapted rules/skills/roles carry an ECC attribution header |
 | `skill_index` | index rows and workflow files match in both directions |
 | `bootstrap` | bootstrap's always-read and referenced files exist; every workflow is routed |
-| `ci_wiring` | the workflow runs `scripts/verify.sh` on push, PR, and dispatch |
+| `ci_wiring` | actual gate/self-test execution, exact required job names, unfiltered triggers, pinned actions, safe checkout and read-only permissions (Python/PyYAML required) |
 | `secrets` | no credential-shaped value anywhere in the repository files; findings are reported as `path:line [category]` with the value redacted |
-| `env_files` | no `.env` / `.env.*` in the tree (`.env.example` only) |
-| `no_app_stack` | no framework/database/UI stack was smuggled in |
+| `env_files` | no `.env*` at any depth (regular `.env.example` only; still secret-scanned) |
+| `lifecycle` | complete, unique, valid project config and a real accepted ADR before enabling a stack |
+| `no_app_stack` | independently validates all lifecycle state; rejects known stack artifacts until a valid transition (then SKIP) |
+| `ruleset` | portable structural branch policy, exact two contexts, no bypass or instance IDs |
 | `agentshield` | static AgentShield scan; `SKIP` (not PASS) when it scanned 0 files |
 | `workflows_yaml` | workflow files parse as YAML (skipped without a YAML parser) |
 
@@ -67,7 +71,10 @@ It injects faults into a **throwaway copy** of the repository (never the real
 tree) and asserts a non-zero exit for each one — including that an injected
 credential fails the gate *without* its value appearing in the output, and that
 credentials are still caught on lines containing words like `example` or
-`todo`. Run it after changing `scripts/verify.sh`.
+`todo`. Cases assert the intended named failure and exit 1, not arbitrary runner
+errors. Lifecycle/metadata/CI/ruleset faults, safe init behavior and deterministic
+scanner reports are tested too, with positive controls. Run it after changing
+`scripts/verify.sh`. Use both ShellCheck 0.9.x and 0.11.x when practical.
 
 ## Report format
 
@@ -77,7 +84,7 @@ Report verification the way it actually came back:
 VERIFICATION
 ============
 command:  bash scripts/verify.sh
-result:   PASS (14 checks passed, 0 failed, 0 skipped)
+result:   <PASS/FAIL — actual passed, failed and skipped counts>
 executed: <name the function/path the run actually reached>
 notes:    <anything skipped, and why>
 ```

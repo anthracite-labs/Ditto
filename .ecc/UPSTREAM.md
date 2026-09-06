@@ -105,3 +105,26 @@ To adopt an upstream change:
 Local Arena adaptations always win over upstream text on conflict: where
 upstream assumes hooks, subagents, or a browser, this adapter must keep the
 Arena-safe behaviour.
+
+## 2026-09-06 — App-Factory foundation sync (not an ECC upgrade)
+
+Ditto retains the reviewed ECC provenance above, including its original adapter
+identity, release pin, upstream-main observation and MIT notice. The reusable
+engineering hardening is synchronized separately from
+[anthracite-labs/App-Factory](https://github.com/anthracite-labs/App-Factory)
+at source commit `ffe4382677c5237d2c86066c96742cf96a5f10fe`, foundation
+version `0.1.0`. This does not change the ECC or AgentShield pins.
+
+`FOUNDATION_SOURCE_REPO`, `FOUNDATION_SOURCE_COMMIT` and `FOUNDATION_SYNCED_AT`
+are appended to [VERSION](VERSION); the foundation version lives in the separate
+root `FOUNDATION_VERSION` file. App-Factory was itself derived from Ditto at
+`5d9cc349d264f73e8da913da9d2cea664522237d`. This sync brings reusable hardening
+back into the independent Ditto repository; it does not replace Ditto history
+with the master template or copy the template's derivation fields as our identity.
+
+Ported material includes lifecycle/ADR validation, initialization safety,
+foundation/provenance checks, CI/ruleset contracts and negative tests. Ditto's
+application-repository adaptations and additional regression hardening are
+recorded in [docs/FOUNDATION.md](../docs/FOUNDATION.md) and
+[ADR-0004](../docs/decisions/0004-foundation-lifecycle-sync.md). No upstream ECC
+skills were added, removed or upgraded as part of this foundation sync.
