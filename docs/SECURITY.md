@@ -35,12 +35,23 @@ tests in `scripts/selftest.sh`:
    stderr, so an accidentally committed credential is not echoed into CI logs
    by the check meant to catch it. Test: `secrets/redaction` asserts the gate
    fails *and* that the injected value is absent from combined output.
-2. **There is no whole-line bypass.** No rule skips a line because it contains
-   a word such as `example`, `todo`, or `sample`. Exemptions are
-   value-specific and structural only: a value made of one repeated
-   alphanumeric character (`xxxxxxxx…`), or an angle-bracket placeholder
-   (`<your-token-here>`). Tests: `secrets/bypass-*` assert real-looking
-   credentials are still caught on lines containing those words.
+2. **There are no exemptions at all.** No rule skips a line because it contains
+   a word such as `example`, `todo`, or `sample`, and no rule skips a value
+   because it "looks like a placeholder". Every match is a finding.
+
+   A repeated-character value is caught, because a structurally simple value
+   can be a real password — an all-x or all-zero assignment is a plausible
+   credential, not evidence of a documentation example. Tests:
+   `secrets/repeated-char-password`, `secrets/repeated-char-token`.
+
+   Documentation should therefore avoid credential-shaped examples entirely.
+   An empty value or an angle-bracket placeholder does not match the patterns,
+   so it needs no exemption; tests `secrets/angle-bracket-not-credential-shaped`
+   and `secrets/empty-value-not-credential-shaped` pin that behaviour.
+
+   Tests `secrets/bypass-*` additionally assert that real-looking credentials
+   are still caught on lines containing `example`, `todo`, `sample`,
+   `placeholder`, and `n/a`.
 
 Dotenv files are enforced rather than merely documented: `check_env_files`
 fails if any `.env` or `.env.*` exists in the tree, because `.gitignore` cannot

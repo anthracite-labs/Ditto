@@ -9,6 +9,40 @@ Durable trade-offs belong in [decisions/](decisions/README.md), not here.
 
 ---
 
+## 2026-09-06 — Independent review round 2 on PR #3 (issue #2)
+
+**Done:** Removed the last secrets-scanner bypass.
+
+Round 1 replaced a whole-line allowlist with "value-specific and structural"
+exemptions. The reviewer correctly pointed out that this was still a bypass: a
+value made of one repeated alphanumeric character was exempted, so an all-x or
+all-zero password assignment passed the gate. `is_placeholder_value` is now
+deleted outright — `check_secrets` has no exemptions of any kind.
+
+**Verified:** `bash scripts/verify.sh` → 14 passed, 0 failed, 1 skipped
+(AgentShield advisory). `bash scripts/selftest.sh` → 28/28 cases, including the
+two the review required (`secrets/repeated-char-password`,
+`secrets/repeated-char-token`).
+
+**Learned:**
+
+- Verified empirically before changing code: the real tree had **zero** matches
+  with no exemptions at all, so the exemption was protecting nothing. When a
+  suppression rule has no demonstrated need, delete it rather than narrowing it.
+- Angle-bracket placeholders never matched the credential regex in the first
+  place, so that exemption was dead code. Confirmed by testing the regex
+  against the literal strings instead of reasoning about it.
+- Removing an exemption surfaces self-matches. Two prose comments spelling out
+  the credential-shaped example then failed the gate. Comments must describe
+  the *shape* ("an all-x assignment"), not spell a matchable instance.
+- Narrowing a bypass is not the same as closing it. Round 1's fix was
+  directionally right and still exploitable; the reviewer caught it.
+
+**Next:** Configure GitHub branch protection on `main` (PR-only, required
+`verify` checks, no direct pushes). Still a repository-admin action.
+
+---
+
 ## 2026-09-06 — Independent review round 1 on PR #3 (issue #2)
 
 **Done:** Addressed all four blocking findings from the ChatGPT review.

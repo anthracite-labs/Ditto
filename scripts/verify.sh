@@ -539,10 +539,13 @@ check_ci_wiring() {
 #      matched text and the source line are never printed, so a real
 #      credential that is accidentally committed cannot be echoed into CI logs
 #      by the very check meant to catch it. Matched material stays in memory.
-#   2. NO LINE-LEVEL BYPASS. There is deliberately no "line contains a word
-#      like example/todo, so skip it" rule. A genuine credential on a line that
-#      also says "example" is still a finding. The only exemptions are
-#      value-specific and structural (see is_placeholder_value).
+#   2. NO EXEMPTIONS. There is no allowlist of any kind - not "line contains a
+#      word like example/todo", and not "value looks like a placeholder". Every
+#      match is a finding. A repeated-character value - an all-x or all-zero
+#      PASSWORD assignment - is still caught, because a structurally simple
+#      value can be a real password. Documentation examples should therefore
+#      simply not be credential-shaped: leave the value empty, or use angle
+#      brackets, neither of which matches the patterns below.
 #
 # Patterns are assembled from string fragments so this script does not match
 # itself.
@@ -567,22 +570,19 @@ check_secrets() {
   )
 
   local -a findings=()
-  local rule category regex hits hit loc match
+  local rule category regex hits hit loc
   for rule in "${rules[@]}"; do
     category="${rule%%|*}"
     regex="${rule#*|}"
-    # -o keeps the match out of the line content we would otherwise have to
-    # quote; we then discard it after the placeholder test.
+    # -o keeps the surrounding line out of the output, so nothing but the
+    # location is ever available to print.
     hits="$(grep -rnoIE --exclude-dir=.git -- "$regex" . 2>/dev/null | sed 's|^\./||')"
     [ -n "$hits" ] || continue
     while IFS= read -r hit; do
       [ -n "$hit" ] || continue
-      # hit is "path:line:matched-text". Keep only "path:line".
+      # hit is "path:line:matched-text". Keep only "path:line"; the matched
+      # text is discarded here and never stored, printed, or logged.
       loc="$(printf '%s' "$hit" | sed -E 's/^([^:]+):([0-9]+):.*$/\1:\2/')"
-      match="${hit#*:*:}"
-      if is_placeholder_value "$match"; then
-        continue
-      fi
       findings+=("${loc} [${category}]")
     done <<< "$hits"
   done
@@ -597,36 +597,6 @@ check_secrets() {
     return 1
   fi
   report_pass "$name" "$file_count file(s) scanned, no credential-shaped values"
-}
-
-# True when a matched value is structurally a placeholder rather than a secret.
-# Deliberately narrow: exemptions are about the VALUE, never about other words
-# appearing on the same line.
-is_placeholder_value() {
-  local matched="$1"
-  # Reduce to the value part: drop any "KEY=" / "key:" prefix the pattern kept.
-  local value="${matched##*[:=]}"
-  # Strip one layer of surrounding quotes.
-  value="${value%\"}"; value="${value#\"}"
-  value="${value%\'}"; value="${value#\'}"
-  [ -n "$value" ] || return 1
-  # Angle-bracket placeholders such as <your-token-here> are documentation.
-  case "$matched" in
-    *'<'*'>'*) return 0 ;;
-  esac
-  # A run of one repeated alphanumerical character (xxxxxxxx, XXXX, 0000) is a
-  # placeholder shape, not entropy. Non-alnum first characters are not treated
-  # as placeholders so that real keys beginning with a symbol are kept.
-  local first
-  first="$(printf '%s' "$value" | cut -c1)"
-  case "$first" in
-    [A-Za-z0-9])
-      if [ "$(printf '%s' "$value" | tr -d "$first" | wc -c | tr -d '[:space:]')" = "0" ]; then
-        return 0
-      fi
-      ;;
-  esac
-  return 1
 }
 
 # --- 11b. dotenv files -------------------------------------------------------

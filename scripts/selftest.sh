@@ -163,16 +163,42 @@ reset_sandbox
 printf 'aws_key = "AK%s"  # example\n' "IASYNTHETIC0000000" > "${SANDBOX}/.selftest-aws.txt"
 expect_fail "secrets/bypass-aws-example" --only=secrets
 
-# --- Placeholder exemptions must stay narrow but functional ------------------
-# An all-x value is a documentation placeholder, not entropy, and must pass.
+# --- Placeholder-shaped values are NOT exempt --------------------------------
+# A structurally simple value can still be a real password, so repeated-character
+# values must be caught. These cases exist because an earlier revision exempted
+# them, which was a bypass: an all-x PASSWORD assignment passed the gate.
 reset_sandbox
-printf 'DITTO_REVIEW_%s=%s\n' 'TOKEN' 'xxxxxxxxxxxxxxxxxxxxxxxxxxxx' > "${SANDBOX}/.selftest-placeholder.txt"
-expect_pass "secrets/placeholder-run-exempt" --only=secrets
+printf '%s=%s\n' 'PASSWORD' 'xxxxxxxxxxxxxxxxxxxxxxxx' > "${SANDBOX}/.selftest-repeat-x.txt"
+expect_fail "secrets/repeated-char-password" --only=secrets
 
-# Angle-bracket placeholders must pass.
+reset_sandbox
+printf '%s=%s\n' 'TOKEN' '0000000000000000' > "${SANDBOX}/.selftest-repeat-0.txt"
+expect_fail "secrets/repeated-char-token" --only=secrets
+
+# Documentation placeholders must not be credential-shaped in the first place.
+# An angle-bracket value does not match the credential patterns, so it passes -
+# because it never matches, not because the scanner exempts it.
 reset_sandbox
 printf 'DITTO_REVIEW_%s=%s\n' 'TOKEN' '<your-token-here-0123456789>' > "${SANDBOX}/.selftest-angle.txt"
-expect_pass "secrets/placeholder-angle-exempt" --only=secrets
+expect_pass "secrets/angle-bracket-not-credential-shaped" --only=secrets
+
+# An empty value is likewise not credential-shaped.
+reset_sandbox
+printf 'DITTO_REVIEW_%s=\n' 'TOKEN' > "${SANDBOX}/.selftest-empty.txt"
+expect_pass "secrets/empty-value-not-credential-shaped" --only=secrets
+
+# Redaction must hold for the repeated-char shape too, since that is now a
+# finding rather than an exemption.
+reset_sandbox
+printf '%s=%s\n' 'PASSWORD' 'SyntheticRepeatCanary0123456789' > "${SANDBOX}/.selftest-leak2.txt"
+gate --only=secrets
+if [ "$GATE_RC" -eq 0 ]; then
+  bad "secrets/redaction-repeated-char" "gate exited 0 on an injected credential"
+elif printf '%s' "$GATE_OUT" | grep -qF 'SyntheticRepeatCanary'; then
+  bad "secrets/redaction-repeated-char" "gate FAILED correctly but LEAKED the value"
+else
+  ok "secrets/redaction-repeated-char" "exit $GATE_RC, value not present in output"
+fi
 
 # --- dotenv enforcement ------------------------------------------------------
 reset_sandbox
