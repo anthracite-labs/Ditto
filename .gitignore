@@ -1,0 +1,9 @@
+# Local scratch and tooling output — nothing here belongs in Git.
+.ecc-cache/
+.reports/
+node_modules/
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
