@@ -20,11 +20,15 @@
 # not committed, so a fresh clone (every new Arena session) has none.
 # See docs/decisions/0002-verification-gate.md.
 
-# Lint note: SC2329 ("function never invoked") is suppressed file-wide because
-# the check_* functions are dispatched by constructed name ("check_${check}")
-# in the run loop at the bottom, so the linter cannot see their call sites.
+# Lint note: SC2329 ("function never invoked") and SC2317 ("command appears to
+# be unreachable") are suppressed file-wide because the check_* functions are
+# dispatched by constructed name ("check_${check}") in the run loop at the
+# bottom, so the linter cannot see their call sites. Which of the two codes is
+# reported depends on the shellcheck version (0.11 reports SC2329 at the
+# definition; 0.9 reports SC2317 on every line inside), so both are listed to
+# keep the gate stable across local and CI toolchains.
 # Every other finding, down to style severity, must still be clean.
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 
 set -uo pipefail
 
