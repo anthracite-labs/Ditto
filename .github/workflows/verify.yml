@@ -42,10 +42,17 @@ jobs:
       - name: Make PyYAML available for the workflow YAML check
         run: python3 -c 'import yaml' 2>/dev/null || pip install --quiet 'pyyaml==6.0.3'
 
-      - name: Run the verification gate (AgentShield required)
+      - name: Run the verification gate
+        # AgentShield runs but scans 0 files here (no Claude config surface in
+        # an Arena adapter), so the gate reports it as SKIP rather than PASS.
+        # It is advisory for this repository, not a security gate. See
+        # docs/SECURITY.md.
         env:
           VERIFY_AGENTSHIELD: require
         run: bash scripts/verify.sh
+
+      - name: Run the negative tests (gate must fail when it should)
+        run: bash scripts/selftest.sh
 
   independent-checks:
     name: Independent checks

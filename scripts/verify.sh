@@ -135,6 +135,7 @@ REQUIRED_FILES=(
   .ecc/BOOTSTRAP.md
   .ecc/VERSION
   .ecc/UPSTREAM.md
+  .ecc/LICENSE-ECC
   .ecc/rules/engineering.md
   .ecc/rules/security.md
   .ecc/rules/testing.md
@@ -165,6 +166,7 @@ REQUIRED_FILES=(
   scripts/bootstrap.sh
   scripts/verify.sh
   scripts/sync-ecc.sh
+  scripts/selftest.sh
   .github/workflows/verify.yml
   .github/PULL_REQUEST_TEMPLATE.md
 )
@@ -173,6 +175,7 @@ REQUIRED_EXECUTABLES=(
   scripts/bootstrap.sh
   scripts/verify.sh
   scripts/sync-ecc.sh
+  scripts/selftest.sh
 )
 
 # --- 1. foundation -----------------------------------------------------------
@@ -340,6 +343,31 @@ check_provenance() {
     bad+=(".ecc/UPSTREAM.md missing")
   else
     grep -qi 'MIT' .ecc/UPSTREAM.md || bad+=(".ecc/UPSTREAM.md does not state the MIT licence")
+    grep -qF '.ecc/LICENSE-ECC' .ecc/UPSTREAM.md ||
+      bad+=(".ecc/UPSTREAM.md does not reference the committed notice .ecc/LICENSE-ECC")
+  fi
+
+  # MIT requires the copyright AND permission notice to travel with adapted
+  # material, so the notice is committed here and its integrity is checked
+  # rather than left to an external link.
+  if [ ! -f .ecc/LICENSE-ECC ]; then
+    bad+=(".ecc/LICENSE-ECC missing (upstream MIT notice must be committed)")
+  else
+    local expected_copy
+    expected_copy="$(version_value UPSTREAM_COPYRIGHT)"
+    grep -qF "$expected_copy" .ecc/LICENSE-ECC ||
+      bad+=(".ecc/LICENSE-ECC is missing the upstream copyright notice")
+    grep -qF 'Permission is hereby granted, free of charge' .ecc/LICENSE-ECC ||
+      bad+=(".ecc/LICENSE-ECC is missing the MIT permission notice")
+    grep -qF 'THE SOFTWARE IS PROVIDED "AS IS"' .ecc/LICENSE-ECC ||
+      bad+=(".ecc/LICENSE-ECC is missing the MIT warranty disclaimer")
+    local expected_sha actual_sha
+    expected_sha="$(version_value UPSTREAM_LICENSE_SHA256)"
+    if [ -n "$expected_sha" ] && command -v sha256sum >/dev/null 2>&1; then
+      actual_sha="$(sha256sum .ecc/LICENSE-ECC | cut -d' ' -f1)"
+      [ "$actual_sha" = "$expected_sha" ] ||
+        bad+=(".ecc/LICENSE-ECC sha256 is $actual_sha, expected $expected_sha")
+    fi
   fi
   if [ "${#bad[@]}" -gt 0 ]; then
     fail_lines "$name" "${#bad[@]} provenance problem(s)" "${bad[@]}"
@@ -502,55 +530,132 @@ check_ci_wiring() {
 }
 
 # --- 11. secrets -------------------------------------------------------------
-# Credential-shaped values must never be committed. Patterns are assembled from
-# fragments so this script does not match itself.
+# Credential-shaped values must never be committed.
+#
+# Two properties are load-bearing here and both are covered by
+# scripts/selftest.sh:
+#
+#   1. REDACTION. A finding is reported as "path:line [category]" only. The
+#      matched text and the source line are never printed, so a real
+#      credential that is accidentally committed cannot be echoed into CI logs
+#      by the very check meant to catch it. Matched material stays in memory.
+#   2. NO LINE-LEVEL BYPASS. There is deliberately no "line contains a word
+#      like example/todo, so skip it" rule. A genuine credential on a line that
+#      also says "example" is still a finding. The only exemptions are
+#      value-specific and structural (see is_placeholder_value).
+#
+# Patterns are assembled from string fragments so this script does not match
+# itself.
 check_secrets() {
   local name="secrets"
   selected "$name" || return 0
-  local -a patterns
-  patterns=(
-    'gh''p_[A-Za-z0-9]{36,}'
-    'github_''pat_[A-Za-z0-9_]{22,}'
-    'gho_[A-Za-z0-9]{36,}'
-    'ghs_[A-Za-z0-9]{36,}'
-    'AK''IA[0-9A-Z]{16}'
-    'xo''x[baprs]-[A-Za-z0-9-]{10,}'
-    'gl''pat-[A-Za-z0-9_-]{20,}'
-    'AI''za[0-9A-Za-z_-]{35}'
-    'sk''-[A-Za-z0-9_-]{20,}'
-    '-----BEGIN ''[A-Z ]*PRIVATE KEY-----'
-    '(API_''KEY|SECRET|TOKEN|PASSWORD|PASSWD|PRIVATE_KEY)[A-Z_]*[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9/+_-]{16,}'
+
+  # "category|regex" pairs. The category is the only thing reported.
+  local -a rules
+  rules=(
+    'github-classic-token|gh''p_[A-Za-z0-9]{36,}'
+    'github-fine-grained-pat|github_''pat_[A-Za-z0-9_]{22,}'
+    'github-oauth-token|gho_[A-Za-z0-9]{36,}'
+    'github-app-token|ghs_[A-Za-z0-9]{36,}'
+    'aws-access-key-id|AK''IA[0-9A-Z]{16}'
+    'slack-token|xo''x[baprs]-[A-Za-z0-9-]{10,}'
+    'gitlab-pat|gl''pat-[A-Za-z0-9_-]{20,}'
+    'google-api-key|AI''za[0-9A-Za-z_-]{35}'
+    'openai-style-key|sk''-[A-Za-z0-9_-]{20,}'
+    'private-key-block|-----BEGIN ''[A-Z ]*PRIVATE KEY-----'
+    'generic-credential-assignment|(API_''KEY|SECRET|TOKEN|PASSWORD|PASSWD|PRIVATE_KEY)[A-Z_]*[[:space:]]*[:=][[:space:]]*["'"'"']?[A-Za-z0-9/+_-]{16,}'
   )
-  local -a allowlist
-  allowlist=(
-    placeholder example changeme 'your-' 'xxx' redacted dummy fake sample
-    '<' '>' 'n/a' 'todo' 'none' 'undefined'
-  )
-  local pat hits line allowed token bad=() scanned=0
-  for pat in "${patterns[@]}"; do
-    hits="$(grep -rnIE --exclude-dir=.git -- "$pat" . 2>/dev/null | sed 's|^\./||')"
+
+  local -a findings=()
+  local rule category regex hits hit loc match
+  for rule in "${rules[@]}"; do
+    category="${rule%%|*}"
+    regex="${rule#*|}"
+    # -o keeps the match out of the line content we would otherwise have to
+    # quote; we then discard it after the placeholder test.
+    hits="$(grep -rnoIE --exclude-dir=.git -- "$regex" . 2>/dev/null | sed 's|^\./||')"
     [ -n "$hits" ] || continue
-    while IFS= read -r line; do
-      [ -n "$line" ] || continue
-      scanned=$((scanned + 1))
-      allowed=0
-      local lowered
-      lowered="$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]')"
-      for token in "${allowlist[@]}"; do
-        case "$lowered" in
-          *"$token"*) allowed=1; break ;;
-        esac
-      done
-      [ "$allowed" -eq 1 ] || bad+=("$line")
+    while IFS= read -r hit; do
+      [ -n "$hit" ] || continue
+      # hit is "path:line:matched-text". Keep only "path:line".
+      loc="$(printf '%s' "$hit" | sed -E 's/^([^:]+):([0-9]+):.*$/\1:\2/')"
+      match="${hit#*:*:}"
+      if is_placeholder_value "$match"; then
+        continue
+      fi
+      findings+=("${loc} [${category}]")
     done <<< "$hits"
   done
+
   local file_count
   file_count="$(find . -type f -not -path './.git/*' | wc -l | tr -d '[:space:]')"
-  if [ "${#bad[@]}" -gt 0 ]; then
-    fail_lines "$name" "${#bad[@]} possible secret(s) in repository files" "${bad[@]}"
+  if [ "${#findings[@]}" -gt 0 ]; then
+    fail_lines "$name" "${#findings[@]} credential-shaped value(s) found (values redacted)" \
+      "${findings[@]}" \
+      "Matched material is intentionally not printed. Open the file at the" \
+      "location above to inspect it, and rotate anything already exposed."
     return 1
   fi
   report_pass "$name" "$file_count file(s) scanned, no credential-shaped values"
+}
+
+# True when a matched value is structurally a placeholder rather than a secret.
+# Deliberately narrow: exemptions are about the VALUE, never about other words
+# appearing on the same line.
+is_placeholder_value() {
+  local matched="$1"
+  # Reduce to the value part: drop any "KEY=" / "key:" prefix the pattern kept.
+  local value="${matched##*[:=]}"
+  # Strip one layer of surrounding quotes.
+  value="${value%\"}"; value="${value#\"}"
+  value="${value%\'}"; value="${value#\'}"
+  [ -n "$value" ] || return 1
+  # Angle-bracket placeholders such as <your-token-here> are documentation.
+  case "$matched" in
+    *'<'*'>'*) return 0 ;;
+  esac
+  # A run of one repeated alphanumerical character (xxxxxxxx, XXXX, 0000) is a
+  # placeholder shape, not entropy. Non-alnum first characters are not treated
+  # as placeholders so that real keys beginning with a symbol are kept.
+  local first
+  first="$(printf '%s' "$value" | cut -c1)"
+  case "$first" in
+    [A-Za-z0-9])
+      if [ "$(printf '%s' "$value" | tr -d "$first" | wc -c | tr -d '[:space:]')" = "0" ]; then
+        return 0
+      fi
+      ;;
+  esac
+  return 1
+}
+
+# --- 11b. dotenv files -------------------------------------------------------
+# .gitignore cannot stop `git add -f`, so the presence of a dotenv file is
+# enforced here rather than left to documentation.
+check_env_files() {
+  local name="env_files"
+  selected "$name" || return 0
+  local -a allowed=(.env.example)
+  local -a found=()
+  local f base ok a
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    base="$(basename -- "$f")"
+    ok=0
+    for a in "${allowed[@]}"; do
+      [ "$base" = "$a" ] && ok=1 && break
+    done
+    [ "$ok" -eq 1 ] || found+=("$f")
+  done < <(
+    find . -maxdepth 3 -type f \( -name '.env' -o -name '.env.*' \) -not -path './.git/*' |
+      sed 's|^\./||' | LC_ALL=C sort
+  )
+  if [ "${#found[@]}" -gt 0 ]; then
+    fail_lines "$name" "${#found[@]} dotenv file(s) present" "${found[@]}" \
+      "Only .env.example may be committed. Secrets belong in the environment."
+    return 1
+  fi
+  report_pass "$name" "no dotenv files committed (only .env.example allowed)"
 }
 
 # --- 12. no application stack ------------------------------------------------
@@ -644,6 +749,14 @@ check_agentshield() {
     fail_lines "$name" "${pkg}@${ver}: $critical critical, $high high finding(s)"
     return 1
   fi
+  # A scan that examined nothing proves nothing. AgentShield targets Claude
+  # Code configuration surfaces (.claude/, hooks, MCP config); this Arena
+  # adapter has none, so the honest result is SKIP, not PASS. Reporting it as
+  # a pass would advertise security coverage that does not exist.
+  if [ "$files" -eq 0 ]; then
+    report_skip "$name" "${pkg}@${ver} ran but scanned 0 file(s): no Claude config surface here (advisory only)"
+    return 0
+  fi
   report_pass "$name" "${pkg}@${ver} static scan clean ($files file(s) scanned)"
 }
 
@@ -690,6 +803,7 @@ register skill_index
 register bootstrap
 register ci_wiring
 register secrets
+register env_files
 register no_app_stack
 register agentshield
 register workflows_yaml

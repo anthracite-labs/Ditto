@@ -44,14 +44,30 @@ ready — read the failures, fix them, re-run.
 | `skill_index` | index rows and workflow files match in both directions |
 | `bootstrap` | bootstrap's always-read and referenced files exist; every workflow is routed |
 | `ci_wiring` | the workflow runs `scripts/verify.sh` on push, PR, and dispatch |
-| `secrets` | no credential-shaped value anywhere in the repository files |
+| `secrets` | no credential-shaped value anywhere in the repository files; findings are reported as `path:line [category]` with the value redacted |
+| `env_files` | no `.env` / `.env.*` in the tree (`.env.example` only) |
 | `no_app_stack` | no framework/database/UI stack was smuggled in |
-| `agentshield` | static AgentShield scan runs clean (skippable offline) |
+| `agentshield` | static AgentShield scan; `SKIP` (not PASS) when it scanned 0 files |
 | `workflows_yaml` | workflow files parse as YAML (skipped without a YAML parser) |
 
 Checks walk the **working tree**, not the git index, so uncommitted work is
 verified too. The only index-aware check is `executable`, which cannot demand a
 mode from a file that has not been added yet.
+
+## Prove the gate can fail
+
+A green gate means nothing unless the gate is capable of going red. Run the
+committed negative tests:
+
+```bash
+bash scripts/selftest.sh
+```
+
+It injects faults into a **throwaway copy** of the repository (never the real
+tree) and asserts a non-zero exit for each one — including that an injected
+credential fails the gate *without* its value appearing in the output, and that
+credentials are still caught on lines containing words like `example` or
+`todo`. Run it after changing `scripts/verify.sh`.
 
 ## Report format
 

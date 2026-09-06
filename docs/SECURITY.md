@@ -25,15 +25,29 @@ covers exactly that.
 - the CI workflow is wired to the gate and cannot be silently decoupled;
 - the AgentShield static scan runs clean when the registry is reachable.
 
-### Known weakness in the automated secrets sweep
+### Properties of the automated secrets sweep
 
-`check_secrets` skips a matching line when that line also contains a common
-placeholder word (`example`, `sample`, `dummy`, `fake`, `redacted`,
-`placeholder`, `none`, `undefined`, `todo`, `n/a`, `xxx`, `your-`, `<`, `>`).
-A genuine credential committed on a line that happens to contain one of those
-words would be missed. The sweep is a floor, not a guarantee: it exists to
-catch the common accident, and human review remains the control for the rest.
-Narrowing this allowlist is a Stage 1 item.
+Two properties are load-bearing and both are covered by committed negative
+tests in `scripts/selftest.sh`:
+
+1. **The detector cannot leak what it finds.** A finding is reported as
+   `path:line [category]` only. Matched material never reaches stdout or
+   stderr, so an accidentally committed credential is not echoed into CI logs
+   by the check meant to catch it. Test: `secrets/redaction` asserts the gate
+   fails *and* that the injected value is absent from combined output.
+2. **There is no whole-line bypass.** No rule skips a line because it contains
+   a word such as `example`, `todo`, or `sample`. Exemptions are
+   value-specific and structural only: a value made of one repeated
+   alphanumeric character (`xxxxxxxx…`), or an angle-bracket placeholder
+   (`<your-token-here>`). Tests: `secrets/bypass-*` assert real-looking
+   credentials are still caught on lines containing those words.
+
+Dotenv files are enforced rather than merely documented: `check_env_files`
+fails if any `.env` or `.env.*` exists in the tree, because `.gitignore` cannot
+stop `git add -f`. `.env.example` is the only permitted template.
+
+These checks are a floor, not a guarantee — a credential in an unrecognised
+shape will pass. Human review remains the control for the rest.
 
 Nothing in `scripts/` executes repository content. Verification parses
 (`bash -n`), lints statically (shellcheck), parses YAML with `safe_load`, and
@@ -61,8 +75,15 @@ npx -y ecc-agentshield@1.4.0 scan --format json
 ```
 
 The deep modes (`--injection`, `--sandbox`, `--taint`, `--deep`) actively
-execute or probe configuration and are never run automatically. If the
-scanner cannot be reached, the check is reported as skipped — never as passed.
+execute or probe configuration and are never run automatically.
+
+**AgentShield is advisory in this repository, not a security gate.** It targets
+Claude Code configuration surfaces (`.claude/`, hooks, MCP config), and this
+Arena adapter has none, so it scans zero files. `scripts/verify.sh` therefore
+reports it as `SKIP` rather than `PASS` whenever `filesScanned == 0` — a scan
+that examined nothing proves nothing, and reporting it as a pass would
+advertise coverage that does not exist. The credential controls that actually
+apply here are `check_secrets` and `check_env_files`, described above.
 
 ## Reporting a security problem
 

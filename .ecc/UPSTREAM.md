@@ -50,19 +50,24 @@ personas** — roughly 1% of the upstream library. That ratio is deliberate; see
 
 ## Licence obligation
 
-Upstream ECC is MIT licensed. The MIT terms — retention of the copyright notice
-and permission notice in copies or substantial portions of the software — are
-satisfied for this repository by:
+Upstream ECC is MIT licensed. MIT requires the copyright notice **and** the
+permission notice to be included in copies or substantial portions of the
+software, so the full upstream notice is committed in this repository at
+[`.ecc/LICENSE-ECC`](LICENSE-ECC) rather than left behind an external link.
+That file is a byte-exact copy of upstream `LICENSE` at tag `v2.2.0`
+(sha256 `326146379f01bb137c0a5d3c54770c1aa31076705c8b88a7f6b26a460f6221b2`),
+and `scripts/verify.sh` (check `provenance`) fails if it is missing, altered,
+or missing any of the copyright, permission, or warranty text.
+
+The obligation is further satisfied by:
 
 1. this file recording upstream copyright and licence;
-2. the upstream `LICENSE` text being available at the pinned commit
-   (`https://github.com/affaan-m/ECC/blob/v2.2.0/LICENSE`);
-3. per-file `Adapted from ECC v2.2.0` attribution headers on every adapted
-   workflow and rule (enforced by `scripts/verify.sh`, check `attribution`).
+2. per-file `Adapted from ECC v2.2.0` attribution headers on every adapted
+   workflow, rule, and persona (enforced by the `attribution` check).
 
 AgentShield is a separate MIT project (`affaan-m/agentshield`); it is executed
-as an unpinned-installed, version-pinned `npx` invocation and never vendored
-into this repository.
+as a version-pinned `npx` invocation and never vendored into this repository,
+so no copy of its licence text is distributed here.
 
 ## Curation policy
 

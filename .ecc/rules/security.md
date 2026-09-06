@@ -66,3 +66,9 @@ credentials, delete directories, or pipe a remote script into a shell.
 `scripts/verify.sh` in static mode only. The deep modes (`--injection`,
 `--sandbox`, `--taint`, `--deep`) actively execute or probe configuration and
 are **never** run automatically — they are manual, explicit, opt-in steps.
+
+Treat AgentShield as **advisory** in this repository: it targets Claude Code
+configuration surfaces, which this Arena adapter does not have, so it scans
+zero files and `verify.sh` reports `SKIP` rather than `PASS`. The controls that
+actually apply here are the `secrets` and `env_files` checks, plus
+`scripts/selftest.sh`, which proves both can fail.

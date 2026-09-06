@@ -9,6 +9,52 @@ Durable trade-offs belong in [decisions/](decisions/README.md), not here.
 
 ---
 
+## 2026-09-06 — Independent review round 1 on PR #3 (issue #2)
+
+**Done:** Addressed all four blocking findings from the ChatGPT review.
+
+1. **Secrets detector leaked what it found.** Findings printed the full matched
+   line, so a committed credential would be echoed into CI logs. Now reports
+   `path:line [category]` only; matched material stays in memory.
+2. **Whole-line placeholder allowlist was a real bypass.** A credential on a
+   line containing `example`/`todo`/`sample` was skipped entirely. Removed.
+   Exemptions are now value-specific and structural only (one repeated
+   alphanumeric char, or an angle-bracket placeholder).
+3. **AgentShield was a vacuous PASS.** It scans Claude Code config surfaces,
+   which this adapter does not have, so it reported `PASS (0 files scanned)`.
+   Now `SKIP` when `filesScanned == 0`, and documented as advisory.
+4. **Upstream MIT notice was only linked.** MIT requires the copyright *and*
+   permission notice to travel with adapted material. Committed byte-exact at
+   `.ecc/LICENSE-ECC`; `check_provenance` verifies its text and sha256.
+
+Also added `check_env_files` (a force-added `.env` now fails, rather than
+relying on `.gitignore` plus a doc claim) and `scripts/selftest.sh`, a
+committed 25-case negative suite that runs in CI.
+
+**Verified:** `bash scripts/verify.sh` → 14 passed, 0 failed, 1 skipped
+(AgentShield advisory). `bash scripts/selftest.sh` → 25/25 cases behaved as
+asserted, including the two the review required.
+
+**Learned:**
+
+- Test fixtures are a disclosure surface. `selftest.sh` initially contained
+  literal credential-shaped strings, and the scanner correctly flagged the
+  test file itself. Fixtures must be assembled from fragments at runtime — the
+  same technique `verify.sh` uses for its own patterns.
+- A detector that reports the secret it found is a second disclosure path.
+  Redact at the point of reporting, not at the point of logging.
+- "Scanned 0 files, all clean" is not a pass. Any check that can report success
+  while examining nothing should report SKIP and say why.
+- `.gitignore` is not enforcement: it cannot stop `git add -f`. Rules that
+  matter belong in the gate.
+
+**Next:** Configure GitHub branch protection on `main` (PR-only, required
+`verify` checks). GitHub reports `main` as unprotected, so the PR-only workflow
+is currently convention, not platform-enforced. This is a repo-admin action and
+must not be done from a feature PR.
+
+---
+
 ## 2026-09-06 — Foundation v0.1: ECC-on-Arena adapter (issue #2)
 
 **Done:** Built the engineering foundation: `.ecc/` adapter (bootstrap, 4

@@ -14,7 +14,7 @@ because there is no application (see [PRODUCT.md](PRODUCT.md)).
                                    ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  GitHub  (durable source of truth)                               │
-│  issues · branches · PRs · Actions · protected main              │
+│  issues · branches · PRs · Actions · main (protection pending)   │
 └───────────────────────────────┬──────────────────────────────────┘
                                 │ clone / push / gh api
                                 ▼

@@ -45,10 +45,21 @@ bash scripts/verify.sh
 The gate is deterministic and exits non-zero on failure. It checks that the
 foundation files exist, that Markdown links resolve, that shell scripts parse
 (and pass shellcheck when available), that required scripts are executable,
-that ECC provenance is recorded, that no credential-shaped value is committed,
-that the skill index and bootstrap references resolve, and that the AgentShield
-static scan runs clean. GitHub Actions runs the same script on every push and
-pull request, so verification does not depend on any one agent's honesty.
+that ECC provenance and the committed upstream MIT notice are intact, that no
+credential-shaped value or dotenv file is committed, and that the skill index
+and bootstrap references resolve. Findings are reported as `path:line
+[category]` with matched material redacted, so the detector cannot leak a
+credential into CI logs.
+
+```bash
+bash scripts/selftest.sh
+```
+
+A green gate means nothing unless it can go red, so the negative tests are
+committed too: they inject faults into a throwaway copy of the repository and
+assert a non-zero exit for each one. GitHub Actions runs both scripts on every
+push and pull request, so verification does not depend on any one agent's
+honesty.
 
 ## Repository map
 
@@ -83,8 +94,10 @@ scripts/sync-ecc.sh           upstream ECC inspection (never overwrites .ecc/)
   choice, or UI without an approved issue and an ADR.
 - `scripts/verify.sh` must pass before commit; `.git/hooks/` is not used for
   enforcement.
-- Work happens on session branches; `main` is protected by review. Arena does
-  not merge its own PRs.
+- Work happens on session branches, and Arena does not merge its own PRs.
+  Note: GitHub branch protection on `main` is **not yet configured** — it is
+  the immediate post-foundation repository task (see `docs/ROADMAP.md`).
+  Until then, PR-only workflow is enforced by convention, not by GitHub.
 
 ## Licence
 

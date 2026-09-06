@@ -18,7 +18,13 @@ issue with real discipline.
 
 ## Stage 1 — Foundation hardening (next, no product decisions)
 
-Candidates, in rough priority order; each needs its own issue:
+**First, and not optional:** configure GitHub branch protection on `main`
+(PR-only changes, required `verify` checks, no direct pushes). GitHub currently
+reports `main` as unprotected, so the PR-only workflow described in
+[README.md](../README.md) is enforced by convention rather than by the platform.
+This is a repository-admin setting and must not be changed from a feature PR.
+
+Other candidates, in rough priority order; each needs its own issue:
 
 - [ ] Exercise the protocol on a real issue and record the friction in
       `docs/MEMORY.md`
