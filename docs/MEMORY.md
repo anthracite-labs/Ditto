@@ -56,6 +56,19 @@ the PR template. No application code, no stack decisions.
 - GitHub Actions has no official `setup-shellcheck` action; ubuntu runners
   already ship shellcheck. Pin `actions/checkout` and `actions/setup-node` by
   commit SHA verified against their tags.
+- **shellcheck findings are version-dependent.** The runner's apt shellcheck is
+  0.9.0; `shellcheck-py` on PyPI is 0.11.0. For dynamically dispatched
+  functions, 0.11 reports `SC2329` at the definition while 0.9 reports
+  `SC2317` on every line inside. Suppressing only one made the gate pass
+  locally and fail in CI on both jobs. Lesson: lint gates must be validated
+  against the CI toolchain version, not just the local one — install the
+  matching version (`pip install shellcheck-py==0.9.0.5`) before claiming a
+  lint gate is green.
+- **Actions log downloads are egress-blocked.** `gh run view --log-failed`
+  fails because `results-receiver.actions.githubusercontent.com` is outside the
+  allowlist. The check-run annotations API on `api.github.com` works but only
+  returns "Process completed with exit code 1". Diagnose CI failures by
+  reproducing the runner's toolchain locally.
 
 **Next:** Independent ChatGPT review of the PR diff; then Stage 1 items in
 [ROADMAP.md](ROADMAP.md) — the highest-value one is exercising the protocol on
