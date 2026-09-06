@@ -1,0 +1,30 @@
+# Ditto ECC-on-Arena adapter — provenance record (machine-readable key=value).
+# Parsed by scripts/verify.sh (check_provenance) and scripts/sync-ecc.sh.
+# Do not remove or rename keys; add new ones at the bottom.
+
+ADAPTER_NAME=ditto-ecc-arena-adapter
+ADAPTER_VERSION=0.1.0
+ADAPTER_KIND=ecc-on-arena-adaptation
+ADAPTER_TARGET_HARNESS=arena-agent-mode
+ADAPTER_NATIVE_ECC_RUNTIME=false
+
+UPSTREAM_NAME=Everything Claude Code (ECC)
+UPSTREAM_REPO=https://github.com/affaan-m/ECC
+UPSTREAM_LICENSE=MIT
+UPSTREAM_COPYRIGHT=Copyright (c) 2026 Affaan Mustafa
+UPSTREAM_LICENSE_FILE=.ecc/LICENSE-ECC
+UPSTREAM_LICENSE_SHA256=326146379f01bb137c0a5d3c54770c1aa31076705c8b88a7f6b26a460f6221b2
+UPSTREAM_VERSION=2.2.0
+UPSTREAM_TAG=v2.2.0
+UPSTREAM_COMMIT=5eddf1a3ffd311423be2d4ba7d26f7209c91b033
+UPSTREAM_NPM_PACKAGE=ecc-universal
+UPSTREAM_NPM_VERSION=2.2.0
+UPSTREAM_MAIN_COMMIT_AT_REVIEW=e04ea0b9cc8248686edf5ac751cadff550e162b8
+UPSTREAM_MAIN_VERSION_AT_REVIEW=2.2.1-unreleased
+UPSTREAM_REVIEWED_AT=2026-09-06
+
+AGENTSHIELD_NPM_PACKAGE=ecc-agentshield
+AGENTSHIELD_NPM_VERSION=1.4.0
+AGENTSHIELD_REPO=https://github.com/affaan-m/agentshield
+AGENTSHIELD_LICENSE=MIT
+AGENTSHIELD_INVOKE=npx -y ecc-agentshield@1.4.0 scan --format json

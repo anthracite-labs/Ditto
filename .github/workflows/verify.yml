@@ -1,0 +1,124 @@
+# Independent verification of the Ditto engineering foundation.
+#
+# GitHub runs the same committed gate (scripts/verify.sh) that the agent runs
+# locally, so quality never depends on an agent's self-report. See
+# docs/decisions/0002-verification-gate.md.
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Foundation gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '22'
+
+      - name: Ensure shellcheck is present
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq shellcheck
+          fi
+          shellcheck --version
+
+      - name: Make PyYAML available for the workflow YAML check
+        run: python3 -c 'import yaml' 2>/dev/null || pip install --quiet 'pyyaml==6.0.3'
+
+      - name: Run the verification gate
+        # AgentShield runs but scans 0 files here (no Claude config surface in
+        # an Arena adapter), so the gate reports it as SKIP rather than PASS.
+        # It is advisory for this repository, not a security gate. See
+        # docs/SECURITY.md.
+        env:
+          VERIFY_AGENTSHIELD: require
+        run: bash scripts/verify.sh
+
+      - name: Run the negative tests (gate must fail when it should)
+        run: bash scripts/selftest.sh
+
+  independent-checks:
+    name: Independent checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Ensure shellcheck is present
+        run: |
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq shellcheck
+          fi
+          shellcheck --version
+
+      - name: Lint shell scripts
+        run: |
+          set -euo pipefail
+          mapfile -t scripts < <(git ls-files -- '*.sh')
+          printf 'shellchecking %s script(s)\n' "${#scripts[@]}"
+          shellcheck --severity=style "${scripts[@]}"
+
+      - name: Verify executable bits in the git index
+        run: |
+          set -euo pipefail
+          fail=0
+          for f in scripts/verify.sh scripts/bootstrap.sh scripts/sync-ecc.sh; do
+            mode="$(git ls-files -s -- "$f" | awk '{print $1}')"
+            if [ "$mode" != "100755" ]; then
+              printf 'not executable in index (mode %s): %s\n' "${mode:-missing}" "$f"
+              fail=1
+            fi
+          done
+          exit "$fail"
+
+      - name: Confirm the adapter is labelled an adaptation, not native ECC
+        run: |
+          set -euo pipefail
+          grep -qi 'ECC-on-Arena adapter' AGENTS.md
+          grep -qi 'not native ECC' AGENTS.md .ecc/BOOTSTRAP.md README.md
+          grep -q 'ADAPTER_NATIVE_ECC_RUNTIME=false' .ecc/VERSION
+
+      - name: Confirm no application stack was introduced
+        run: |
+          set -euo pipefail
+          forbidden=(package.json requirements.txt pyproject.toml Dockerfile tsconfig.json)
+          fail=0
+          for f in "${forbidden[@]}"; do
+            if [ -e "$f" ]; then
+              printf 'application-stack artifact present: %s\n' "$f"
+              fail=1
+            fi
+          done
+          for d in src app lib client server; do
+            if [ -d "$d" ]; then
+              printf 'application directory present: %s/\n' "$d"
+              fail=1
+            fi
+          done
+          exit "$fail"
+
+      - name: Report adapter surface
+        run: |
+          set -euo pipefail
+          printf 'rules:  %s\n' "$(git ls-files -- '.ecc/rules/*.md' | wc -l)"
+          printf 'skills: %s\n' "$(git ls-files -- '.ecc/skills/*.md' | wc -l)"
+          printf 'roles:  %s\n' "$(git ls-files -- '.ecc/roles/*.md' | wc -l)"
+          printf 'adrs:   %s\n' "$(git ls-files -- 'docs/decisions/*.md' | wc -l)"
