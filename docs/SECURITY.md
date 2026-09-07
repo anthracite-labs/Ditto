@@ -13,17 +13,26 @@ covers exactly that.
 | Credentials | Token committed to Git, or leaked into logs/PR bodies | `scripts/verify.sh` secrets check (CI-enforced); no real credential is ever needed locally |
 | Supply chain | Malicious or typosquatted dependency; floating CI action tag | Pinned versions; allowlisted registries; `contents: read` CI permissions |
 | CI runner | Workflow that executes untrusted input, or needs excess scope | Minimal permissions; no secrets required by the verify workflow |
-| Engineering system | A weakened check that silently passes | Checks fail closed; weakening a gate requires justification in review |
+| Engineering system | A weakened check that silently passes | Named negative tests plus positive controls; weakening a gate requires justification in review |
+| Lifecycle | Untracked overrides or an unrelated/proposed ADR enabling a stack | Complete committed config validation and accepted, explicit stack metadata, even in standalone checks |
+| Governance | Portable JSON mistaken for applied GitHub settings; optional or decoy CI jobs | Structural ruleset/CI contracts; human audit of live rules and bypass access in `docs/FOUNDATION.md` |
 
 ## Rules that are enforced automatically
 
 `scripts/verify.sh` (run locally and by `.github/workflows/verify.yml`):
 
-- no credential-shaped value in any tracked file;
+- no credential-shaped value in the working-tree files, including untracked work;
 - no secret-looking `.env*` file committed;
-- ECC provenance present, so adapted material stays attributable;
-- the CI workflow is wired to the gate and cannot be silently decoupled;
-- the AgentShield static scan runs clean when the registry is reachable.
+- the reviewed ECC pin, full MIT notice, Ditto adapter identity and foundation
+  source provenance remain intact;
+- actual CI gate/self-test invocations and exact required job names are validated,
+  with no skip/failure-suppression, shell-environment or checkout-ref overrides;
+- lifecycle keys are complete and unambiguous; metadata in comments, fences or
+  prose and unconfined ADR paths cannot authorize a stack;
+- the ruleset has the intended policy structure and exactly two required CI
+  contexts, with no bypass actors or repository-specific identifiers;
+- the pinned AgentShield static invocation is checked when reachable, with
+  zero-file results reported as SKIP/advisory, not PASS.
 
 ### Properties of the automated secrets sweep
 
@@ -34,7 +43,10 @@ tests in `scripts/selftest.sh`:
    `path:line [category]` only. Matched material never reaches stdout or
    stderr, so an accidentally committed credential is not echoed into CI logs
    by the check meant to catch it. Test: `secrets/redaction` asserts the gate
-   fails *and* that the injected value is absent from combined output.
+   fails *and* that the injected value is absent from combined output. Colons
+   and newlines in filenames cannot break redaction; credential-shaped filenames
+   are redacted too. The gate banner does not echo unvalidated version/config
+   values, and AgentShield reports only normalized counters, never finding text.
 2. **There are no exemptions at all.** No rule skips a line because it contains
    a word such as `example`, `todo`, or `sample`, and no rule skips a value
    because it "looks like a placeholder". Every match is a finding.
@@ -54,24 +66,35 @@ tests in `scripts/selftest.sh`:
    `placeholder`, and `n/a`.
 
 Dotenv files are enforced rather than merely documented: `check_env_files`
-fails if any `.env` or `.env.*` exists in the tree, because `.gitignore` cannot
-stop `git add -f`. `.env.example` is the only permitted template.
+fails if any `.env*` path exists at any depth, because `.gitignore` cannot
+stop `git add -f`. A regular `.env.example` file is the only permitted template;
+a symlink is not an example, and example contents still receive the secrets scan.
+`config/project.env` is committed lifecycle data, not a dotenv file: it is never
+sourced and must not contain credentials.
 
 These checks are a floor, not a guarantee — a credential in an unrecognised
 shape will pass. Human review remains the control for the rest.
 
-Nothing in `scripts/` executes repository content. Verification parses
-(`bash -n`), lints statically (shellcheck), parses YAML with `safe_load`, and
-runs the pinned scanner in static mode. `curl` is used only against
-`api.github.com`. No script uses `sudo`.
+The committed gate and test harness are executable repository code and require
+review. Config and ADR inputs are parsed as data, never sourced or evaluated.
+Verification uses `bash -n`, static ShellCheck, safe YAML/JSON loaders and the
+pinned scanner in static mode. The self-test harness executes only its explicit
+fixture mutations and the real gate in disposable copies. `curl` in the ECC
+inspection helper is used only against `api.github.com`; no repository script
+uses `sudo` or applies GitHub administrative settings.
 
 ## Rules that are enforced by review
 
 - No secret in a commit, PR body, issue comment, or log line.
 - Least privilege in CI: `contents: read` unless a job proves it needs more.
 - Dependencies pinned, from `registry.npmjs.org` or `pypi.org` only.
-- Any change to `.ecc/**` or `AGENTS.md` is reviewed as executable code,
-  because an agent will act on it.
+- Any change to `.ecc/**`, `AGENTS.md`, `config/**`, `scripts/**` or CI is
+  reviewed as executable policy, because an agent or runner will act on it.
+- No direct pushes to main and no self-merge. Independent ChatGPT review is
+  required before an authorized maintainer merges agent-authored work.
+- No GitHub administrative settings are changed by a repository script. Live
+  rules and bypass access are separate from committed portable policy; the
+  zero-human-approval workflow does not platform-enforce ChatGPT review.
 - Mandatory security review triggers are listed in
   `.ecc/rules/security.md`; the procedure is `.ecc/skills/security-review.md`.
 
@@ -95,6 +118,10 @@ reports it as `SKIP` rather than `PASS` whenever `filesScanned == 0` — a scan
 that examined nothing proves nothing, and reporting it as a pass would
 advertise coverage that does not exist. The credential controls that actually
 apply here are `check_secrets` and `check_env_files`, described above.
+
+Malformed or incomplete scanner summaries are rejected rather than defaulted to
+zero. The package/version pin is revalidated before execution even when the
+AgentShield check runs alone. None of this makes a zero-file scan meaningful.
 
 ## Reporting a security problem
 

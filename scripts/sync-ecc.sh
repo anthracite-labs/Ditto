@@ -193,4 +193,7 @@ printf '  2. bump UPSTREAM_VERSION / UPSTREAM_TAG / UPSTREAM_COMMIT / UPSTREAM_R
 printf '  3. record the upgrade as an ADR in docs/decisions/\n'
 printf '  4. bash scripts/verify.sh must pass\n'
 
+printf '\nAn ECC upgrade is never implied by a FOUNDATION_VERSION bump.\n'
+printf 'It requires its own reviewed issue, ADR, pins and licence verification.\n'
+
 exit 0

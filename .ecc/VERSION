@@ -28,3 +28,10 @@ AGENTSHIELD_NPM_VERSION=1.4.0
 AGENTSHIELD_REPO=https://github.com/affaan-m/agentshield
 AGENTSHIELD_LICENSE=MIT
 AGENTSHIELD_INVOKE=npx -y ecc-agentshield@1.4.0 scan --format json
+
+# Ditto foundation sync provenance. This is separate from the ECC/scanner pins.
+# FOUNDATION_VERSION at the repository root identifies the reusable foundation.
+# Ditto keeps its own adapter identity, reviewed ECC record and project history.
+FOUNDATION_SOURCE_REPO=https://github.com/anthracite-labs/App-Factory
+FOUNDATION_SOURCE_COMMIT=ffe4382677c5237d2c86066c96742cf96a5f10fe
+FOUNDATION_SYNCED_AT=2026-09-06

@@ -14,6 +14,12 @@ lifecycle hooks, and no subagents. Nothing here claims otherwise.
 product definition, no framework, no database, no UI. Do not invent any.
 Engineering-system work is in scope; application decisions are not.
 
+**Lifecycle state.** Read `config/project.env`: Ditto is in `discovery`, with
+`ALLOW_APP_STACK=0` and no stack ADR. Later transitions are reviewed config
+changes, never environment overrides or edits to the gate. The phases and
+accepted-stack requirements are documented in `docs/FOUNDATION.md`.
+`FOUNDATION_VERSION` identifies the App-Factory foundation sync, not ECC.
+
 ---
 
 ## Step 0 — Always read (small, ~5 files)
@@ -23,6 +29,7 @@ Engineering-system work is in scope; application decisions are not.
 | `.ecc/BOOTSTRAP.md` | This protocol. |
 | `.ecc/rules/engineering.md` | The non-negotiable engineering rules. |
 | `.ecc/skills/INDEX.md` | The workflow router — pick from it, do not read it all. |
+| `config/project.env` | Committed project identity and lifecycle; never source it as shell. |
 | `docs/MEMORY.md` | What previous sessions learned. Append to it. |
 | `ARENA_CAPABILITIES.md` | Only if the task touches tooling, network, or CI limits. Skim, don't memorise. |
 
@@ -101,7 +108,7 @@ not committed does not survive — the sandbox is destroyed between sessions.
 
 ## Step 8 — Prepare the PR
 
-1. Re-run `bash scripts/verify.sh`; it must exit 0.
+1. Re-run `bash scripts/verify.sh` and `bash scripts/selftest.sh`; both must exit 0.
 2. `git diff main...HEAD` — read every changed file; remove scratch work.
 3. Commit with a conventional-commit message (`.ecc/rules/git.md`).
 4. Push the session branch only. **Never push to `main`.**
