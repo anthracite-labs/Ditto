@@ -1,8 +1,8 @@
 # ADR-0004: Sync the reviewed foundation without re-templating Ditto
 
 **Date:** 2026-09-06
-**Status:** proposed
-**Deciders:** Ditto maintainers; implementation requested in Arena, independent PR review pending
+**Status:** accepted
+**Deciders:** Ditto maintainers; implementation requested in Arena, independent ChatGPT review completed on 2026-09-07
 
 ## Context
 
@@ -93,8 +93,9 @@ identity-only and non-destructive; `--force` cannot regress lifecycle state.
 
 ### Follow-ups
 
-- Independent ChatGPT review of the real migration PR before any merge; this
-  decision remains proposed until that review is accepted.
+- Independent ChatGPT review [completed successfully on 2026-09-07](https://github.com/anthracite-labs/Ditto/pull/4#pullrequestreview-5127176109).
+  This foundation decision is accepted; any merge remains a maintainer action,
+  not an Arena self-merge.
 - An administrator may compare/audit live rules and bypass access as described
   in `docs/FOUNDATION.md`; the migration itself makes no admin changes.
 - A product owner must define Ditto before architecture selection. No product,

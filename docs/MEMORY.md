@@ -245,3 +245,31 @@ not just this local record. [ADR-0004](decisions/0004-foundation-lifecycle-sync.
 remains proposed until review is accepted. See [FOUNDATION.md](FOUNDATION.md) for
 the explicit source differences, lifecycle contract and human-only admin audit.
 Product definition remains the product owner's next decision, not an agent's.
+
+---
+
+## 2026-09-07 — PR #4 ADR/review-status consistency
+
+**Done:** Addressed the [latest independent ChatGPT review](https://github.com/anthracite-labs/Ditto/pull/4#pullrequestreview-5127176109),
+which accepted the implementation on `ead7d10f618b21d19a81b723eb7e2023f2918ef7`
+and requested only ADR/review-status consistency. ADR-0004 and its index now
+record **accepted**, and its directly related wording records the completed
+review rather than a pending one. The PR review checkbox/body is updated to
+match. This entry supersedes the earlier pending-review observation without
+rewriting that historical entry.
+
+**Scope:** Documentation/status only. No changes to scripts, self-tests, CI,
+config, provenance, application lifecycle, or earlier ADRs. Acceptance of this
+foundation ADR does not authorize an application stack: Ditto remains discovery
+with `ALLOW_APP_STACK=0` and an empty stack ADR.
+
+**Verified:** Serial runs with both ShellCheck **0.9.0** and **0.11.0** passed:
+`bash scripts/verify.sh` **17 passed, 0 failed, 1 skipped** (AgentShield ran but
+scanned zero files; advisory only); `bash scripts/selftest.sh` **257/257**.
+Style-level ShellCheck passed under both versions. One initial parallel local
+run reported a `skill_index/unrouted-workflow` assertion failure (256/257); the
+same gate/assertion pair passed 50 isolated executions and both full serial
+reruns passed. The cause was not established; no harness change was made.
+
+**Next:** Check fresh CI on the status-only follow-up and leave PR #4 open for
+reviewer/maintainer handling. No self-merge, main push or administrative change.

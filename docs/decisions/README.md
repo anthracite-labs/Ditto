@@ -19,7 +19,7 @@ re-litigating it. Procedure:
 | [0001](0001-ecc-on-arena-adapter.md) | Adopt an ECC-on-Arena adapter instead of native ECC | accepted | 2026-09-06 |
 | [0002](0002-verification-gate.md) | `scripts/verify.sh` + GitHub Actions as the sole quality gate | accepted | 2026-09-06 |
 | [0003](0003-flat-skill-files.md) | Flat per-task workflow files instead of upstream `SKILL.md` directories | accepted | 2026-09-06 |
-| [0004](0004-foundation-lifecycle-sync.md) | Sync the reviewed foundation without re-templating Ditto | proposed (independent review pending) | 2026-09-06 |
+| [0004](0004-foundation-lifecycle-sync.md) | Sync the reviewed foundation without re-templating Ditto | accepted | 2026-09-06 |
 
 ## Application-stack metadata
 
